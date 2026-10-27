@@ -73,10 +73,13 @@
       <button id="play2" disabled>▶ Taklidim</button>
       <button id="rev2" disabled>◀ Taklidimin tersi</button>
     </div>
-    <div class="row">
-      <button class="ghost" id="playOrig">▶ Orijinali göster</button>
-    </div>
     <div class="status" id="status2"></div>
+  </section>
+
+  <section class="card wide reveal">
+    <h2>Cevap</h2>
+    <p class="hint">Tahmin söylendikten sonra 1. oyuncunun düz kaydını çal.</p>
+    <button class="ghost" id="playOrig" disabled>▶ Orijinali göster</button>
   </section>
 
   <section class="card wide">
@@ -140,17 +143,28 @@ function reversed(buf) {
   return out;
 }
 
-function play(buf) {
-  if (!buf) return;
+const REVERSE_RATE = 0.9;
+
+function stop() {
   if (current) try { current.stop(); } catch {}
+  current = null;
+}
+
+function play(buf, rate = 1) {
+  if (!buf) return;
+  stop();
   current = audio().createBufferSource();
   current.buffer = buf;
+  current.playbackRate.value = rate;
   current.connect(ctx.destination);
   current.start();
 }
 
+const playReversed = buf => buf && play(reversed(buf), REVERSE_RATE);
+
 async function toggleRecord(slot, btn, statusEl, onDone) {
   if (recorder && recorder.state === "recording") { recorder.stop(); return; }
+  stop();
   try {
     stream = stream || await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (e) {
@@ -180,19 +194,20 @@ $("rec1").onclick = () => toggleRecord(1, $("rec1"), $("status1"), () => {
   $("play1").disabled = $("rev1").disabled = $("done1").disabled = false;
 });
 $("play1").onclick = () => play(buffers[1]);
-$("rev1").onclick = () => play(reversed(buffers[1]));
+$("rev1").onclick = () => playReversed(buffers[1]);
 $("done1").onclick = () => {
   $("card1").classList.add("disabled");
   $("card2").classList.remove("disabled");
+  $("playOrig").disabled = false;
   $("status1").textContent = "Kayıt hazır. Sıra rakipte.";
 };
 
-$("revOther").onclick = () => play(reversed(buffers[1]));
+$("revOther").onclick = () => playReversed(buffers[1]);
 $("rec2").onclick = () => toggleRecord(2, $("rec2"), $("status2"), () => {
   $("play2").disabled = $("rev2").disabled = false;
 });
 $("play2").onclick = () => play(buffers[2]);
-$("rev2").onclick = () => play(reversed(buffers[2]));
+$("rev2").onclick = () => playReversed(buffers[2]);
 $("playOrig").onclick = () => play(buffers[1]);
 
 // --- Puan tablosu ---
@@ -221,7 +236,8 @@ $("nameA").oninput = $("nameB").oninput = render;
 $("next").onclick = () => {
   rounds.push({ A: 0, B: 0 });
   buffers[1] = buffers[2] = null;
-  for (const id of ["play1", "rev1", "done1", "play2", "rev2"]) $(id).disabled = true;
+  stop();
+  for (const id of ["play1", "rev1", "done1", "play2", "rev2", "playOrig"]) $(id).disabled = true;
   for (const id of ["status1", "status2"]) $(id).textContent = "";
   $("card1").classList.remove("disabled");
   $("card2").classList.add("disabled");
